@@ -1,0 +1,6 @@
+*.lock
+vendor/bundle
+.bundle
+*.swp
+*~
+secret.yml
