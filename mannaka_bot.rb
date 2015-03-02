@@ -18,6 +18,9 @@ class MannakaBot
 
     def reply()
         mentions = getRecentMentions(@since_id)
+        if mentions.length == 0
+            return { :status => "no_update", :last_id => @since_id }
+        end
         mentions.each do |mention|
             dates = findDatesInText(mention.text)
             p "those dates founded:"
@@ -37,7 +40,6 @@ class MannakaBot
                     p "date: #{date}"
                 end
                 p "original tweet: #{mention.text}"
-                
             end
         end
         { :status => "success", :last_id => mentions[0].id }
@@ -97,9 +99,6 @@ class MannakaBot
         end
     end
 
-    def getFamousName(date)
-    end
-
     def calcDate(date1, date2)
         uri = URI.parse('http://localhost:9393/result')
         http = Net::HTTP.new(uri.host, uri.port)
@@ -122,8 +121,16 @@ class MannakaBot
         when "mannakaDate"
             "真ん中誕生日は#{data.month}月#{data.day}日です。 #mannaka_bot"
         when "famousName"
+
         else
         end
+    end
+
+    def getFamousName(date)
+        score = @config['score']
+        month_name_list = YAML.load_file("data/#{date.month}")
+        famous_names = month_name_list[date.day].select { |person| person['score'] > 1000 }
+        
     end
 
     def postReply(client, user_id, text, reply_id)
@@ -139,10 +146,11 @@ config = conf.merge(secret)
 
 status_file_path = 'config/status'
 if File.exist?(status_file_path)
-    status = File.read(status_file_path, :encoding => Encoding::UTF_8)
-    bot = MannakaBot.new(status, config)
+    status_id = File.read(status_file_path, :encoding => Encoding::UTF_8)
+    bot = MannakaBot.new(status_id, config)
 else
     bot = MannakaBot.new(1, config)
 end
 result = bot.reply
-File.write(status_file_path, result['last_id']) if result['status'] == "success"
+p result
+File.write(status_file_path, result[:last_id]) if result[:status] == "success"

@@ -6,7 +6,8 @@ require 'json'
 
 class BirthCrawler
     @@number_of_days = {
-        "1" => 31,
+        # "1" => 31,
+        "1" => 3,
         "2" => 29,
         "3" => 31,
         "4" => 30,
@@ -20,7 +21,8 @@ class BirthCrawler
         "12" => 31
     }
 
-    def initialize()
+    def initialize(file_dir)
+        @file_dir = file_dir
     end
 
     def crawl (month)
@@ -29,10 +31,7 @@ class BirthCrawler
         p month
         p @days
         @list = getBirthdayList(month, @days)
-    
-        File.open("./temp.json","w") do |f|
-            f.write(@list.to_json)
-        end
+        File.write("#{@file_dir}/../data/#{month}.json", @list.to_json)  
     end
 
     private
@@ -42,13 +41,14 @@ class BirthCrawler
     end
 
     def getBirthdayList(month, days)
-        @birthday_list = {}
+        birthday_list = {}
         (1..days).each do |day|
-            @url = URI.escape("http://ja.wikipedia.org/wiki/#{month}月#{day}日")
-            @names_urls = getNamesWithUrls(extractBirthdayNodes(downloadPage(@url)))
-            @birthday_list[day] = @names_urls
+            url = URI.escape("http://ja.wikipedia.org/wiki/#{month}月#{day}日")
+            names_urls = getNamesWithUrls(extractBirthdayNodes(downloadPage(url)))
+            birthday_list[day] = names_urls
+            sleep(10)
         end
-        @birthday_list
+        birthday_list
     end
 
     def downloadPage(url)
@@ -66,25 +66,39 @@ class BirthCrawler
     end
 
     def getNamesWithUrls(nodes)
-        @names_urls = []
+        names_urls = []
         nodes.each do |node|
-            @name = getNameFromNode(node)
-            @namenode = node.xpath("a[text()='#{@name}']")
-            if @namenode.empty?
-                @url = ""
+            name = getNameFromNode(node)
+            namenode = node.xpath("a[text()='#{name}']")
+            if namenode.empty?
+                url = ""
             else
-                @url = @namenode.attribute("href").text
+                url = namenode.attribute("href").text
             end
-            @names_urls.push({:name => @name, :url => @url})
+            score = getNameScore(name)
+            names_urls.push({ :name => name, :url => url, :score => score })
         end
-        @names_urls
+        names_urls
+    end
+
+    def getNameScore(name)
+        url = URI.escape("http://www.google.com/search?q=#{name}")
+        nodeset = downloadPage(url)
+        number_node = nodeset.css("#resultStats")
+        if number_node.empty?
+            result = 0
+        else
+            number_node.text.match(/About\s(([0-9]|,)*)\sresults/)
+            $1.to_i
+        end
     end
 
 end
 
 
 arg = ARGV[0]
-cr = BirthCrawler.new
+file_dir = File.dirname(__FILE__)
+cr = BirthCrawler.new(file_dir)
 
 if arg == "all"
     (1..12).each do |m|
